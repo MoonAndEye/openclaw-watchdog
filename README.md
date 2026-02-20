@@ -10,10 +10,24 @@ The watchdog checks `localhost:8787` every 10 minutes and runs `openclaw gateway
 - Node.js >= 18
 - OpenClaw CLI available on `PATH`
 
-## Install (npm)
+## Installation
+
+### npm (recommended)
 
 ```bash
 npm install -g openclaw-watchdog
+```
+
+### Homebrew
+
+This repository includes a formula template at `Formula/openclaw-watchdog.rb`.
+
+1. Update the formula `sha256` with the npm tarball checksum for your release.
+2. Install from your tap:
+
+```bash
+brew tap <your-org>/<your-tap>
+brew install openclaw-watchdog
 ```
 
 ## CLI Usage
@@ -58,6 +72,10 @@ openclaw-watchdog logs
 - Uses absolute paths in LaunchAgent `ProgramArguments`.
 - No privileged operations; writes only to user home directories.
 - Runner executes a fixed command (`openclaw gateway start`) and logs outcomes.
+
+## Bash scripts included
+
+- `scripts/check-macos.sh`: postinstall check that warns when installed on non-macOS.
 
 ## Development
 

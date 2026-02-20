@@ -15,7 +15,9 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "prepare": "npm run build",
-    "start": "node dist/src/cli.js"
+    "start": "node dist/src/cli.js",
+    "prepack": "npm run clean && npm run build",
+    "postinstall": "bash scripts/check-macos.sh"
   },
   "dependencies": {
     "commander": "^12.1.0"
@@ -23,5 +25,12 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
-  }
+  },
+  "files": [
+    "bin",
+    "dist",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ]
 }

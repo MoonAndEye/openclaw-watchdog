@@ -4,6 +4,12 @@ import { printLogs } from './logs';
 import { printStatus } from './status';
 import { uninstallWatchdog } from './uninstall';
 
+function ensureMacOS(): void {
+  if (process.platform !== 'darwin') {
+    throw new Error('openclaw-watchdog is macOS-only and requires launchd.');
+  }
+}
+
 async function run(): Promise<void> {
   const program = new Command();
 
@@ -16,6 +22,7 @@ async function run(): Promise<void> {
     .command('install')
     .description('Install and load the launchd watchdog agent')
     .action(async () => {
+      ensureMacOS();
       await installWatchdog();
       console.log('OpenClaw watchdog installed and loaded.');
     });
@@ -24,6 +31,7 @@ async function run(): Promise<void> {
     .command('uninstall')
     .description('Unload and remove the launchd watchdog agent')
     .action(async () => {
+      ensureMacOS();
       await uninstallWatchdog();
       console.log('OpenClaw watchdog uninstalled.');
     });
@@ -32,6 +40,7 @@ async function run(): Promise<void> {
     .command('status')
     .description('Show watchdog and gateway status')
     .action(async () => {
+      ensureMacOS();
       await printStatus();
     });
 
@@ -39,6 +48,7 @@ async function run(): Promise<void> {
     .command('logs')
     .description('Print the last 50 watchdog log lines')
     .action(async () => {
+      ensureMacOS();
       await printLogs();
     });
 
