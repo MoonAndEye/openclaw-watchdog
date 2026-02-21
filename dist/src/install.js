@@ -26,12 +26,21 @@ function resolveOpenclawPath() {
         throw new Error('Could not find "openclaw" on PATH. Make sure OpenClaw is installed.');
     }
 }
-async function installWatchdog() {
+async function installWatchdog(options = {}) {
     const openclawPath = resolveOpenclawPath();
+    const intervalMs = options.intervalMinutes
+        ? options.intervalMinutes * 60_000
+        : undefined;
     node_fs_1.default.mkdirSync(constants_1.LAUNCH_AGENTS_DIR, { recursive: true });
     (0, logger_1.ensureLogDirectory)();
-    // Save resolved openclaw path for the runner to use under launchd
-    node_fs_1.default.writeFileSync(constants_1.CONFIG_FILE_PATH, `${JSON.stringify({ openclawPath }, null, 2)}\n`, { mode: 0o644 });
+    // Save config for the runner to use under launchd
+    const config = { openclawPath };
+    if (intervalMs !== undefined) {
+        config.checkIntervalMs = intervalMs;
+    }
+    node_fs_1.default.writeFileSync(constants_1.CONFIG_FILE_PATH, `${JSON.stringify(config, null, 2)}\n`, {
+        mode: 0o644,
+    });
     const logFile = (0, logger_1.getLogFilePath)();
     const runnerPath = getRunnerPath();
     const plistContents = (0, launchd_1.generateLaunchdPlist)({

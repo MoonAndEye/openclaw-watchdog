@@ -18,18 +18,29 @@ import { ensureLogDirectory, logError, logInfo, logWarn } from './logger';
 
 const execFile = promisify(execFileCb);
 
-function loadOpenclawPath(): string {
+interface RunnerConfig {
+  openclawPath: string;
+  checkIntervalMs: number;
+}
+
+function loadConfig(): RunnerConfig {
   try {
     const raw = fs.readFileSync(CONFIG_FILE_PATH, 'utf8');
-    const config = JSON.parse(raw) as { openclawPath?: string };
+    const config = JSON.parse(raw) as {
+      openclawPath?: string;
+      checkIntervalMs?: number;
+    };
     if (config.openclawPath) {
-      return config.openclawPath;
+      return {
+        openclawPath: config.openclawPath,
+        checkIntervalMs: config.checkIntervalMs ?? CHECK_INTERVAL_MS,
+      };
     }
   } catch {
     // config missing or invalid
   }
   throw new Error(
-    `Cannot read openclaw path from ${CONFIG_FILE_PATH}. Run "openclaw-watchdog install" first.`,
+    `Cannot read config from ${CONFIG_FILE_PATH}. Run "openclaw-watchdog install" first.`,
   );
 }
 
@@ -102,7 +113,9 @@ export async function runWatchdog(): Promise<void> {
     return;
   }
 
-  const openclawPath = loadOpenclawPath();
+  const config = loadConfig();
+  const openclawPath = config.openclawPath;
+  const checkInterval = config.checkIntervalMs;
   const nodeBinDir = path.dirname(process.execPath);
   const execEnv = {
     ...process.env,
@@ -185,14 +198,16 @@ export async function runWatchdog(): Promise<void> {
     }
   };
 
-  logInfo('OpenClaw watchdog runner started.');
+  logInfo(
+    `OpenClaw watchdog runner started. Check interval: ${Math.floor(checkInterval / 60000)} minutes.`,
+  );
   await runCheck();
   setInterval(() => {
     runCheck().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       logError(`Unexpected runner error: ${message}`);
     });
-  }, CHECK_INTERVAL_MS);
+  }, checkInterval);
 }
 
 if (require.main === module) {
