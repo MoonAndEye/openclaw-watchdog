@@ -18,9 +18,20 @@ function getRunnerPath() {
 function getNodePath() {
     return process.execPath;
 }
+function resolveOpenclawPath() {
+    try {
+        return (0, node_child_process_1.execFileSync)('which', ['openclaw'], { encoding: 'utf8' }).trim();
+    }
+    catch {
+        throw new Error('Could not find "openclaw" on PATH. Make sure OpenClaw is installed.');
+    }
+}
 async function installWatchdog() {
+    const openclawPath = resolveOpenclawPath();
     node_fs_1.default.mkdirSync(constants_1.LAUNCH_AGENTS_DIR, { recursive: true });
     (0, logger_1.ensureLogDirectory)();
+    // Save resolved openclaw path for the runner to use under launchd
+    node_fs_1.default.writeFileSync(constants_1.CONFIG_FILE_PATH, `${JSON.stringify({ openclawPath }, null, 2)}\n`, { mode: 0o644 });
     const logFile = (0, logger_1.getLogFilePath)();
     const runnerPath = getRunnerPath();
     const plistContents = (0, launchd_1.generateLaunchdPlist)({
@@ -33,6 +44,7 @@ async function installWatchdog() {
     });
     node_fs_1.default.writeFileSync(constants_1.PLIST_PATH, plistContents, { mode: 0o644 });
     try {
+        // Hardcoded path constant, not user input
         await exec(`launchctl unload ${shellQuote(constants_1.PLIST_PATH)}`);
     }
     catch {
@@ -40,6 +52,7 @@ async function installWatchdog() {
     }
     await exec(`launchctl load ${shellQuote(constants_1.PLIST_PATH)}`);
     (0, logger_1.logInfo)(`Installed launchd agent at ${constants_1.PLIST_PATH}`);
+    (0, logger_1.logInfo)(`Resolved openclaw path: ${openclawPath}`);
 }
 function shellQuote(value) {
     return `'${value.replace(/'/g, `'\\''`)}'`;

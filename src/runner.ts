@@ -1,8 +1,10 @@
-import { exec as execWithCallback } from 'node:child_process';
+import { execFile as execFileCb } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import {
   CHECK_INTERVAL_MS,
+  CONFIG_FILE_PATH,
   COOLDOWN_MS,
   HEALTH_CHECK_URL,
   PID_FILE_PATH,
@@ -14,7 +16,22 @@ import {
 import { checkGatewayHealth } from './health';
 import { ensureLogDirectory, logError, logInfo, logWarn } from './logger';
 
-const exec = promisify(execWithCallback);
+const execFile = promisify(execFileCb);
+
+function loadOpenclawPath(): string {
+  try {
+    const raw = fs.readFileSync(CONFIG_FILE_PATH, 'utf8');
+    const config = JSON.parse(raw) as { openclawPath?: string };
+    if (config.openclawPath) {
+      return config.openclawPath;
+    }
+  } catch {
+    // config missing or invalid
+  }
+  throw new Error(
+    `Cannot read openclaw path from ${CONFIG_FILE_PATH}. Run "openclaw-watchdog install" first.`,
+  );
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -85,6 +102,14 @@ export async function runWatchdog(): Promise<void> {
     return;
   }
 
+  const openclawPath = loadOpenclawPath();
+  const nodeBinDir = path.dirname(process.execPath);
+  const execEnv = {
+    ...process.env,
+    PATH: `${nodeBinDir}:${process.env.PATH ?? '/usr/bin:/bin'}`,
+  };
+  logInfo(`Using openclaw at: ${openclawPath}`);
+
   process.on('exit', releasePidLock);
   process.on('SIGINT', () => {
     releasePidLock();
@@ -128,12 +153,15 @@ export async function runWatchdog(): Promise<void> {
     }
 
     logWarn(
-      'Health check failed. Attempting restart with "openclaw gateway start".',
+      'Health check failed. Attempting restart with "openclaw gateway install --force".',
     );
 
     try {
-      // Hardcoded command — not user input, safe to use exec
-      const { stdout, stderr } = await exec('openclaw gateway start');
+      const { stdout, stderr } = await execFile(
+        openclawPath,
+        ['gateway', 'install', '--force'],
+        { env: execEnv },
+      );
       if (stdout.trim()) {
         logInfo(`Restart command output: ${stdout.trim()}`);
       }

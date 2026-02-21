@@ -6,11 +6,25 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.runWatchdog = runWatchdog;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = __importDefault(require("node:fs"));
+const node_path_1 = __importDefault(require("node:path"));
 const node_util_1 = require("node:util");
 const constants_1 = require("./constants");
 const health_1 = require("./health");
 const logger_1 = require("./logger");
-const exec = (0, node_util_1.promisify)(node_child_process_1.exec);
+const execFile = (0, node_util_1.promisify)(node_child_process_1.execFile);
+function loadOpenclawPath() {
+    try {
+        const raw = node_fs_1.default.readFileSync(constants_1.CONFIG_FILE_PATH, 'utf8');
+        const config = JSON.parse(raw);
+        if (config.openclawPath) {
+            return config.openclawPath;
+        }
+    }
+    catch {
+        // config missing or invalid
+    }
+    throw new Error(`Cannot read openclaw path from ${constants_1.CONFIG_FILE_PATH}. Run "openclaw-watchdog install" first.`);
+}
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -70,6 +84,13 @@ async function runWatchdog() {
         (0, logger_1.logWarn)('Another watchdog instance is already running. Exiting.');
         return;
     }
+    const openclawPath = loadOpenclawPath();
+    const nodeBinDir = node_path_1.default.dirname(process.execPath);
+    const execEnv = {
+        ...process.env,
+        PATH: `${nodeBinDir}:${process.env.PATH ?? '/usr/bin:/bin'}`,
+    };
+    (0, logger_1.logInfo)(`Using openclaw at: ${openclawPath}`);
     process.on('exit', releasePidLock);
     process.on('SIGINT', () => {
         releasePidLock();
@@ -98,10 +119,9 @@ async function runWatchdog() {
             (0, logger_1.logWarn)(`Restart limit exceeded (${constants_1.RESTART_LIMIT} within ${Math.floor(constants_1.RESTART_WINDOW_MS / 60000)} minutes). Pausing restarts for ${Math.floor(constants_1.COOLDOWN_MS / 60000)} minutes.`);
             return;
         }
-        (0, logger_1.logWarn)('Health check failed. Attempting restart with "openclaw gateway start".');
+        (0, logger_1.logWarn)('Health check failed. Attempting restart with "openclaw gateway install --force".');
         try {
-            // Hardcoded command — not user input, safe to use exec
-            const { stdout, stderr } = await exec('openclaw gateway start');
+            const { stdout, stderr } = await execFile(openclawPath, ['gateway', 'install', '--force'], { env: execEnv });
             if (stdout.trim()) {
                 (0, logger_1.logInfo)(`Restart command output: ${stdout.trim()}`);
             }
