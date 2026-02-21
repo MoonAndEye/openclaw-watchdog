@@ -2,7 +2,7 @@
 
 A production-ready, **macOS-only** Node.js CLI that installs a `launchd` watchdog for OpenClaw Gateway.
 
-The watchdog checks `http://127.0.0.1:18789/` every 10 minutes and runs `openclaw gateway install --force` when the service is not responsive.
+The watchdog periodically checks `http://127.0.0.1:18789/` and runs `openclaw gateway install --force` when the service is not responsive.
 
 ## Requirements
 
@@ -12,67 +12,68 @@ The watchdog checks `http://127.0.0.1:18789/` every 10 minutes and runs `opencla
 
 ## Installation
 
-### npm (recommended)
-
 ```bash
 npm install -g openclaw-watchdog
 ```
 
-### Homebrew
+## CLI Commands
 
-This repository includes a formula template at `Formula/openclaw-watchdog.rb`.
+### `openclaw-watchdog install`
 
-1. Update the formula `sha256` with the npm tarball checksum for your release.
-2. Install from your tap:
-
-```bash
-brew tap <your-org>/<your-tap>
-brew install openclaw-watchdog
-```
-
-## CLI Usage
+Register and start the watchdog as a macOS LaunchAgent. Only needs to run once — the watchdog will auto-start on every login after this.
 
 ```bash
-openclaw-watchdog install
-openclaw-watchdog uninstall
-openclaw-watchdog status
-openclaw-watchdog logs
+openclaw-watchdog install              # default: check every 10 minutes
+openclaw-watchdog install --interval 5 # check every 5 minutes
 ```
 
-## What `install` does
+**Options:**
 
-- Resolves the absolute path to `openclaw` and saves it to `~/Library/Logs/openclaw-watchdog/config.json` (so the runner works under launchd where `PATH` is minimal)
+| Flag | Description |
+|------|-------------|
+| `--interval <minutes>` | Health check interval in minutes (default: 10) |
+
+**What it does:**
+
+- Resolves the absolute path to `openclaw` and saves it to config (so the runner works under launchd where `PATH` is minimal)
 - Creates `~/Library/LaunchAgents/com.openclaw.watchdog.plist`
-- Configures `launchd` with:
-  - `RunAtLoad = true` (starts at login)
-  - `KeepAlive = true` (keeps runner alive)
-- Loads the agent using `launchctl load`
-- Writes logs to:
-  - `~/Library/Logs/openclaw-watchdog/watchdog.log`
+- Configures `launchd` with `RunAtLoad = true` and `KeepAlive = true`
+- Loads the agent immediately
+
+### `openclaw-watchdog uninstall`
+
+Stop the watchdog and remove the LaunchAgent from the system.
+
+### `openclaw-watchdog status`
+
+Show the current state of the watchdog and gateway.
+
+```
+OpenClaw Watchdog Status
+========================
+LaunchAgent plist: Present
+launchctl loaded:  Yes
+Gateway (http://127.0.0.1:18789/): Responsive
+
+Watchdog is installed and loaded.
+```
+
+### `openclaw-watchdog logs`
+
+Print the last 50 lines of the watchdog log (`~/Library/Logs/openclaw-watchdog/watchdog.log`).
 
 ## Runner behavior
 
-- Health check interval: `600s` (configurable constant in `src/constants.ts`)
 - Health check method: HTTP GET `http://127.0.0.1:18789/` (expects 2xx)
 - On failure: executes `openclaw gateway install --force`
 - Post-restart verification: retries health check up to 3 times (5s intervals) to confirm gateway started
-- Single-process protection: uses a PID file lock (`~/Library/Logs/openclaw-watchdog/watchdog.pid`) to ensure only one watchdog instance runs
-- Crash-loop protection:
-  - If restart attempts exceed 5 within 5 minutes,
-  - restart attempts are paused for 10 minutes,
-  - warning is written to the log.
-
-## Why launchd (and not cron / PM2)
-
-- `launchd` is native macOS process supervision.
-- User-level LaunchAgents require no sudo and integrate with login sessions.
-- `cron` is schedule-focused and does not provide robust process supervision.
-- `PM2` is a generic Node process manager; this project intentionally minimizes dependencies and aligns with native macOS service management.
+- Single-process protection: uses a PID file lock to ensure only one watchdog instance runs
+- Crash-loop protection: if restart attempts exceed 5 within 5 minutes, pauses for 10 minutes
 
 ## Security considerations
 
 - Runs as the current user (not root).
-- Uses absolute paths in LaunchAgent `ProgramArguments` and for the `openclaw` binary.
+- Uses absolute paths for the `openclaw` binary and LaunchAgent `ProgramArguments`.
 - No privileged operations; writes only to user home directories.
 - Runner executes a fixed command (`openclaw gateway install --force`) and logs outcomes.
 

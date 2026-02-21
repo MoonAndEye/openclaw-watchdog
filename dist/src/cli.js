@@ -15,14 +15,23 @@ async function run() {
     program
         .name('openclaw-watchdog')
         .description('macOS launchd watchdog for OpenClaw Gateway')
-        .version('1.0.0');
+        .version('1.0.1');
     program
         .command('install')
         .description('Install and load the launchd watchdog agent')
-        .action(async () => {
+        .option('--interval <minutes>', 'Health check interval in minutes (default: 10)')
+        .action(async (opts) => {
         ensureMacOS();
-        await (0, install_1.installWatchdog)();
-        console.log('OpenClaw watchdog installed and loaded.');
+        const intervalMinutes = opts.interval
+            ? parseInt(opts.interval, 10)
+            : undefined;
+        if (intervalMinutes !== undefined &&
+            (Number.isNaN(intervalMinutes) || intervalMinutes < 1)) {
+            throw new Error('--interval must be a positive integer (minutes).');
+        }
+        await (0, install_1.installWatchdog)({ intervalMinutes });
+        const display = intervalMinutes ?? 10;
+        console.log(`OpenClaw watchdog installed and loaded. Health check every ${display} minutes.`);
     });
     program
         .command('uninstall')

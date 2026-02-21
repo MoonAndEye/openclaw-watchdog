@@ -31,18 +31,29 @@ function resolveOpenclawPath(): string {
   }
 }
 
-export async function installWatchdog(): Promise<void> {
+export interface InstallOptions {
+  intervalMinutes?: number;
+}
+
+export async function installWatchdog(
+  options: InstallOptions = {},
+): Promise<void> {
   const openclawPath = resolveOpenclawPath();
+  const intervalMs = options.intervalMinutes
+    ? options.intervalMinutes * 60_000
+    : undefined;
 
   fs.mkdirSync(LAUNCH_AGENTS_DIR, { recursive: true });
   ensureLogDirectory();
 
-  // Save resolved openclaw path for the runner to use under launchd
-  fs.writeFileSync(
-    CONFIG_FILE_PATH,
-    `${JSON.stringify({ openclawPath }, null, 2)}\n`,
-    { mode: 0o644 },
-  );
+  // Save config for the runner to use under launchd
+  const config: Record<string, unknown> = { openclawPath };
+  if (intervalMs !== undefined) {
+    config.checkIntervalMs = intervalMs;
+  }
+  fs.writeFileSync(CONFIG_FILE_PATH, `${JSON.stringify(config, null, 2)}\n`, {
+    mode: 0o644,
+  });
 
   const logFile = getLogFilePath();
   const runnerPath = getRunnerPath();

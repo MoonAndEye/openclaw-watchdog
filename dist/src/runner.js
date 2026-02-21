@@ -12,18 +12,21 @@ const constants_1 = require("./constants");
 const health_1 = require("./health");
 const logger_1 = require("./logger");
 const execFile = (0, node_util_1.promisify)(node_child_process_1.execFile);
-function loadOpenclawPath() {
+function loadConfig() {
     try {
         const raw = node_fs_1.default.readFileSync(constants_1.CONFIG_FILE_PATH, 'utf8');
         const config = JSON.parse(raw);
         if (config.openclawPath) {
-            return config.openclawPath;
+            return {
+                openclawPath: config.openclawPath,
+                checkIntervalMs: config.checkIntervalMs ?? constants_1.CHECK_INTERVAL_MS,
+            };
         }
     }
     catch {
         // config missing or invalid
     }
-    throw new Error(`Cannot read openclaw path from ${constants_1.CONFIG_FILE_PATH}. Run "openclaw-watchdog install" first.`);
+    throw new Error(`Cannot read config from ${constants_1.CONFIG_FILE_PATH}. Run "openclaw-watchdog install" first.`);
 }
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -84,7 +87,9 @@ async function runWatchdog() {
         (0, logger_1.logWarn)('Another watchdog instance is already running. Exiting.');
         return;
     }
-    const openclawPath = loadOpenclawPath();
+    const config = loadConfig();
+    const openclawPath = config.openclawPath;
+    const checkInterval = config.checkIntervalMs;
     const nodeBinDir = node_path_1.default.dirname(process.execPath);
     const execEnv = {
         ...process.env,
@@ -143,14 +148,14 @@ async function runWatchdog() {
             restartTimestamps = recordRestart(restartTimestamps, now);
         }
     };
-    (0, logger_1.logInfo)('OpenClaw watchdog runner started.');
+    (0, logger_1.logInfo)(`OpenClaw watchdog runner started. Check interval: ${Math.floor(checkInterval / 60000)} minutes.`);
     await runCheck();
     setInterval(() => {
         runCheck().catch((error) => {
             const message = error instanceof Error ? error.message : String(error);
             (0, logger_1.logError)(`Unexpected runner error: ${message}`);
         });
-    }, constants_1.CHECK_INTERVAL_MS);
+    }, checkInterval);
 }
 if (require.main === module) {
     runWatchdog().catch((error) => {
