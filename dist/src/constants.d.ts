@@ -1,6 +1,6 @@
 export declare const LABEL = "com.openclaw.watchdog";
 export declare const HEALTH_CHECK_URL = "http://127.0.0.1:18789/";
-export declare const CHECK_INTERVAL_MS = 60000;
+export declare const CHECK_INTERVAL_MS = 600000;
 export declare const RESTART_VERIFY_DELAY_MS = 5000;
 export declare const RESTART_VERIFY_RETRIES = 3;
 export declare const RESTART_WINDOW_MS: number;

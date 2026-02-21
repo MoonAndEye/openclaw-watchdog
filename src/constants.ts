@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export const LABEL = 'com.openclaw.watchdog';
 export const HEALTH_CHECK_URL = 'http://127.0.0.1:18789/';
-export const CHECK_INTERVAL_MS = 60_000;
+export const CHECK_INTERVAL_MS = 600_000;
 export const RESTART_VERIFY_DELAY_MS = 5_000;
 export const RESTART_VERIFY_RETRIES = 3;
 export const RESTART_WINDOW_MS = 5 * 60_000;
