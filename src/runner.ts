@@ -1,42 +1,39 @@
 import { exec as execWithCallback } from 'node:child_process';
-import net from 'node:net';
 import { promisify } from 'node:util';
 import {
   CHECK_INTERVAL_MS,
   COOLDOWN_MS,
-  PORT,
+  HEALTH_CHECK_URL,
   RESTART_LIMIT,
+  RESTART_VERIFY_DELAY_MS,
+  RESTART_VERIFY_RETRIES,
   RESTART_WINDOW_MS
 } from './constants';
+import { checkGatewayHealth } from './health';
 import { logError, logInfo, logWarn } from './logger';
 
 const exec = promisify(execWithCallback);
 
-async function isGatewayResponsive(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    let settled = false;
-
-    const finish = (value: boolean): void => {
-      if (!settled) {
-        settled = true;
-        socket.destroy();
-        resolve(value);
-      }
-    };
-
-    socket.setTimeout(5000);
-    socket.once('connect', () => finish(true));
-    socket.once('timeout', () => finish(false));
-    socket.once('error', () => finish(false));
-    socket.connect(port, '127.0.0.1');
-  });
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function recordRestart(restartTimestamps: number[], now: number): number[] {
   const updated = restartTimestamps.filter((time) => now - time <= RESTART_WINDOW_MS);
   updated.push(now);
   return updated;
+}
+
+async function verifyRestart(): Promise<boolean> {
+  for (let i = 0; i < RESTART_VERIFY_RETRIES; i++) {
+    await sleep(RESTART_VERIFY_DELAY_MS);
+    const healthy = await checkGatewayHealth();
+    if (healthy) {
+      return true;
+    }
+    logWarn(`Restart verification attempt ${i + 1}/${RESTART_VERIFY_RETRIES} failed, retrying...`);
+  }
+  return false;
 }
 
 export async function runWatchdog(): Promise<void> {
@@ -51,9 +48,9 @@ export async function runWatchdog(): Promise<void> {
       return;
     }
 
-    const healthy = await isGatewayResponsive(PORT);
+    const healthy = await checkGatewayHealth();
     if (healthy) {
-      logInfo(`Health check succeeded on localhost:${PORT}.`);
+      logInfo(`Health check succeeded: ${HEALTH_CHECK_URL}`);
       return;
     }
 
@@ -71,6 +68,7 @@ export async function runWatchdog(): Promise<void> {
     logWarn('Health check failed. Attempting restart with "openclaw gateway start".');
 
     try {
+      // Hardcoded command — not user input, safe to use exec
       const { stdout, stderr } = await exec('openclaw gateway start');
       if (stdout.trim()) {
         logInfo(`Restart command output: ${stdout.trim()}`);
@@ -79,7 +77,13 @@ export async function runWatchdog(): Promise<void> {
         logWarn(`Restart command stderr: ${stderr.trim()}`);
       }
       restartTimestamps = recordRestart(restartTimestamps, now);
-      logInfo('Restart command completed.');
+
+      const verified = await verifyRestart();
+      if (verified) {
+        logInfo('Gateway restarted and verified healthy.');
+      } else {
+        logError('Gateway restart command succeeded but health check still failing.');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logError(`Restart command failed: ${message}`);
