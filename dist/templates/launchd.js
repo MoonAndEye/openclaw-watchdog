@@ -6,13 +6,13 @@ const XML_ESCAPE_MAP = {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    "'": '&apos;'
+    "'": '&apos;',
 };
 function escapeXml(value) {
     return value.replace(/[&<>"']/g, (char) => XML_ESCAPE_MAP[char]);
 }
 function generateLaunchdPlist(options) {
-    const { label, nodePath, runnerPath, workingDirectory, stdoutPath, stderrPath } = options;
+    const { label, nodePath, runnerPath, workingDirectory, stdoutPath, stderrPath, } = options;
     return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">

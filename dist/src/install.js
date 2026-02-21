@@ -8,9 +8,9 @@ const node_child_process_1 = require("node:child_process");
 const node_fs_1 = __importDefault(require("node:fs"));
 const node_path_1 = __importDefault(require("node:path"));
 const node_util_1 = require("node:util");
+const launchd_1 = require("../templates/launchd");
 const constants_1 = require("./constants");
 const logger_1 = require("./logger");
-const launchd_1 = require("../templates/launchd");
 const exec = (0, node_util_1.promisify)(node_child_process_1.exec);
 function getRunnerPath() {
     return node_path_1.default.resolve(__dirname, 'runner.js');
@@ -29,7 +29,7 @@ async function installWatchdog() {
         runnerPath,
         workingDirectory: node_path_1.default.dirname(runnerPath),
         stdoutPath: logFile,
-        stderrPath: logFile
+        stderrPath: logFile,
     });
     node_fs_1.default.writeFileSync(constants_1.PLIST_PATH, plistContents, { mode: 0o644 });
     try {

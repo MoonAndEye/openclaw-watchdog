@@ -28,7 +28,7 @@ function acquirePidLock() {
     try {
         const content = node_fs_1.default.readFileSync(constants_1.PID_FILE_PATH, 'utf8').trim();
         const existingPid = parseInt(content, 10);
-        if (!isNaN(existingPid) && isProcessRunning(existingPid)) {
+        if (!Number.isNaN(existingPid) && isProcessRunning(existingPid)) {
             return false; // another watchdog is already running
         }
     }
@@ -71,8 +71,14 @@ async function runWatchdog() {
         return;
     }
     process.on('exit', releasePidLock);
-    process.on('SIGINT', () => { releasePidLock(); process.exit(0); });
-    process.on('SIGTERM', () => { releasePidLock(); process.exit(0); });
+    process.on('SIGINT', () => {
+        releasePidLock();
+        process.exit(0);
+    });
+    process.on('SIGTERM', () => {
+        releasePidLock();
+        process.exit(0);
+    });
     let restartTimestamps = [];
     let cooldownUntil = 0;
     const runCheck = async () => {

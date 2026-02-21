@@ -9,7 +9,7 @@ import {
   RESTART_LIMIT,
   RESTART_VERIFY_DELAY_MS,
   RESTART_VERIFY_RETRIES,
-  RESTART_WINDOW_MS
+  RESTART_WINDOW_MS,
 } from './constants';
 import { checkGatewayHealth } from './health';
 import { ensureLogDirectory, logError, logInfo, logWarn } from './logger';
@@ -35,7 +35,7 @@ function acquirePidLock(): boolean {
   try {
     const content = fs.readFileSync(PID_FILE_PATH, 'utf8').trim();
     const existingPid = parseInt(content, 10);
-    if (!isNaN(existingPid) && isProcessRunning(existingPid)) {
+    if (!Number.isNaN(existingPid) && isProcessRunning(existingPid)) {
       return false; // another watchdog is already running
     }
   } catch {
@@ -58,7 +58,9 @@ function releasePidLock(): void {
 }
 
 function recordRestart(restartTimestamps: number[], now: number): number[] {
-  const updated = restartTimestamps.filter((time) => now - time <= RESTART_WINDOW_MS);
+  const updated = restartTimestamps.filter(
+    (time) => now - time <= RESTART_WINDOW_MS,
+  );
   updated.push(now);
   return updated;
 }
@@ -70,7 +72,9 @@ async function verifyRestart(): Promise<boolean> {
     if (healthy) {
       return true;
     }
-    logWarn(`Restart verification attempt ${i + 1}/${RESTART_VERIFY_RETRIES} failed, retrying...`);
+    logWarn(
+      `Restart verification attempt ${i + 1}/${RESTART_VERIFY_RETRIES} failed, retrying...`,
+    );
   }
   return false;
 }
@@ -82,8 +86,14 @@ export async function runWatchdog(): Promise<void> {
   }
 
   process.on('exit', releasePidLock);
-  process.on('SIGINT', () => { releasePidLock(); process.exit(0); });
-  process.on('SIGTERM', () => { releasePidLock(); process.exit(0); });
+  process.on('SIGINT', () => {
+    releasePidLock();
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    releasePidLock();
+    process.exit(0);
+  });
 
   let restartTimestamps: number[] = [];
   let cooldownUntil = 0;
@@ -92,7 +102,9 @@ export async function runWatchdog(): Promise<void> {
     const now = Date.now();
 
     if (now < cooldownUntil) {
-      logWarn(`Cooldown active until ${new Date(cooldownUntil).toISOString()}, skipping restart attempts.`);
+      logWarn(
+        `Cooldown active until ${new Date(cooldownUntil).toISOString()}, skipping restart attempts.`,
+      );
       return;
     }
 
@@ -102,18 +114,22 @@ export async function runWatchdog(): Promise<void> {
       return;
     }
 
-    restartTimestamps = restartTimestamps.filter((time) => now - time <= RESTART_WINDOW_MS);
+    restartTimestamps = restartTimestamps.filter(
+      (time) => now - time <= RESTART_WINDOW_MS,
+    );
     if (restartTimestamps.length >= RESTART_LIMIT) {
       cooldownUntil = now + COOLDOWN_MS;
       logWarn(
         `Restart limit exceeded (${RESTART_LIMIT} within ${Math.floor(
-          RESTART_WINDOW_MS / 60000
-        )} minutes). Pausing restarts for ${Math.floor(COOLDOWN_MS / 60000)} minutes.`
+          RESTART_WINDOW_MS / 60000,
+        )} minutes). Pausing restarts for ${Math.floor(COOLDOWN_MS / 60000)} minutes.`,
       );
       return;
     }
 
-    logWarn('Health check failed. Attempting restart with "openclaw gateway start".');
+    logWarn(
+      'Health check failed. Attempting restart with "openclaw gateway start".',
+    );
 
     try {
       // Hardcoded command — not user input, safe to use exec
@@ -130,7 +146,9 @@ export async function runWatchdog(): Promise<void> {
       if (verified) {
         logInfo('Gateway restarted and verified healthy.');
       } else {
-        logError('Gateway restart command succeeded but health check still failing.');
+        logError(
+          'Gateway restart command succeeded but health check still failing.',
+        );
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

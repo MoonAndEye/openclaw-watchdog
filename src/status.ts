@@ -25,12 +25,16 @@ export async function printStatus(): Promise<void> {
   console.log('========================');
   console.log(`LaunchAgent plist: ${plistExists ? 'Present' : 'Missing'}`);
   console.log(`launchctl loaded:  ${loaded ? 'Yes' : 'No'}`);
-  console.log(`Gateway (${HEALTH_CHECK_URL}): ${gatewayHealthy ? 'Responsive' : 'Not responsive'}`);
+  console.log(
+    `Gateway (${HEALTH_CHECK_URL}): ${gatewayHealthy ? 'Responsive' : 'Not responsive'}`,
+  );
 
   if (plistExists && loaded) {
     console.log('\nWatchdog is installed and loaded.');
   } else if (plistExists) {
-    console.log('\nWatchdog plist exists, but agent is not loaded. Try reinstalling.');
+    console.log(
+      '\nWatchdog plist exists, but agent is not loaded. Try reinstalling.',
+    );
   } else {
     console.log('\nWatchdog is not installed.');
   }

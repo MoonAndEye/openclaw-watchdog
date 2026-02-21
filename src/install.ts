@@ -2,9 +2,9 @@ import { exec as execWithCallback } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { generateLaunchdPlist } from '../templates/launchd';
 import { LABEL, LAUNCH_AGENTS_DIR, PLIST_PATH } from './constants';
 import { ensureLogDirectory, getLogFilePath, logInfo } from './logger';
-import { generateLaunchdPlist } from '../templates/launchd';
 
 const exec = promisify(execWithCallback);
 
@@ -28,7 +28,7 @@ export async function installWatchdog(): Promise<void> {
     runnerPath,
     workingDirectory: path.dirname(runnerPath),
     stdoutPath: logFile,
-    stderrPath: logFile
+    stderrPath: logFile,
   });
 
   fs.writeFileSync(PLIST_PATH, plistContents, { mode: 0o644 });
