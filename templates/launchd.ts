@@ -3,7 +3,7 @@ const XML_ESCAPE_MAP: Record<string, string> = {
   '<': '&lt;',
   '>': '&gt;',
   '"': '&quot;',
-  "'": '&apos;'
+  "'": '&apos;',
 };
 
 function escapeXml(value: string): string {
@@ -18,7 +18,14 @@ export function generateLaunchdPlist(options: {
   stdoutPath: string;
   stderrPath: string;
 }): string {
-  const { label, nodePath, runnerPath, workingDirectory, stdoutPath, stderrPath } = options;
+  const {
+    label,
+    nodePath,
+    runnerPath,
+    workingDirectory,
+    stdoutPath,
+    stderrPath,
+  } = options;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

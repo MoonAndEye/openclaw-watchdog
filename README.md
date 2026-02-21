@@ -2,7 +2,7 @@
 
 A production-ready, **macOS-only** Node.js CLI that installs a `launchd` watchdog for OpenClaw Gateway.
 
-The watchdog checks `localhost:8787` every 10 minutes and runs `openclaw gateway start` when the service is not responsive.
+The watchdog checks `http://127.0.0.1:18789/` every 10 minutes and runs `openclaw gateway install --force` when the service is not responsive.
 
 ## Requirements
 
@@ -41,6 +41,7 @@ openclaw-watchdog logs
 
 ## What `install` does
 
+- Resolves the absolute path to `openclaw` and saves it to `~/Library/Logs/openclaw-watchdog/config.json` (so the runner works under launchd where `PATH` is minimal)
 - Creates `~/Library/LaunchAgents/com.openclaw.watchdog.plist`
 - Configures `launchd` with:
   - `RunAtLoad = true` (starts at login)
@@ -52,8 +53,10 @@ openclaw-watchdog logs
 ## Runner behavior
 
 - Health check interval: `600s` (configurable constant in `src/constants.ts`)
-- Health check method: TCP connection to `localhost:8787`
-- On failure: executes `openclaw gateway start`
+- Health check method: HTTP GET `http://127.0.0.1:18789/` (expects 2xx)
+- On failure: executes `openclaw gateway install --force`
+- Post-restart verification: retries health check up to 3 times (5s intervals) to confirm gateway started
+- Single-process protection: uses a PID file lock (`~/Library/Logs/openclaw-watchdog/watchdog.pid`) to ensure only one watchdog instance runs
 - Crash-loop protection:
   - If restart attempts exceed 5 within 5 minutes,
   - restart attempts are paused for 10 minutes,
@@ -69,19 +72,16 @@ openclaw-watchdog logs
 ## Security considerations
 
 - Runs as the current user (not root).
-- Uses absolute paths in LaunchAgent `ProgramArguments`.
+- Uses absolute paths in LaunchAgent `ProgramArguments` and for the `openclaw` binary.
 - No privileged operations; writes only to user home directories.
-- Runner executes a fixed command (`openclaw gateway start`) and logs outcomes.
-
-## Bash scripts included
-
-- `scripts/check-macos.sh`: postinstall check that warns when installed on non-macOS.
+- Runner executes a fixed command (`openclaw gateway install --force`) and logs outcomes.
 
 ## Development
 
 ```bash
 npm install
 npm run build
+npm run lint
 node dist/src/cli.js status
 ```
 

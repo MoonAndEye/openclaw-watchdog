@@ -1,10 +1,15 @@
-import { exec as execWithCallback } from 'node:child_process';
+import { execFileSync, exec as execWithCallback } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { LABEL, LAUNCH_AGENTS_DIR, PLIST_PATH } from './constants';
-import { ensureLogDirectory, getLogFilePath, logInfo } from './logger';
 import { generateLaunchdPlist } from '../templates/launchd';
+import {
+  CONFIG_FILE_PATH,
+  LABEL,
+  LAUNCH_AGENTS_DIR,
+  PLIST_PATH,
+} from './constants';
+import { ensureLogDirectory, getLogFilePath, logInfo } from './logger';
 
 const exec = promisify(execWithCallback);
 
@@ -16,9 +21,28 @@ function getNodePath(): string {
   return process.execPath;
 }
 
+function resolveOpenclawPath(): string {
+  try {
+    return execFileSync('which', ['openclaw'], { encoding: 'utf8' }).trim();
+  } catch {
+    throw new Error(
+      'Could not find "openclaw" on PATH. Make sure OpenClaw is installed.',
+    );
+  }
+}
+
 export async function installWatchdog(): Promise<void> {
+  const openclawPath = resolveOpenclawPath();
+
   fs.mkdirSync(LAUNCH_AGENTS_DIR, { recursive: true });
   ensureLogDirectory();
+
+  // Save resolved openclaw path for the runner to use under launchd
+  fs.writeFileSync(
+    CONFIG_FILE_PATH,
+    `${JSON.stringify({ openclawPath }, null, 2)}\n`,
+    { mode: 0o644 },
+  );
 
   const logFile = getLogFilePath();
   const runnerPath = getRunnerPath();
@@ -28,12 +52,13 @@ export async function installWatchdog(): Promise<void> {
     runnerPath,
     workingDirectory: path.dirname(runnerPath),
     stdoutPath: logFile,
-    stderrPath: logFile
+    stderrPath: logFile,
   });
 
   fs.writeFileSync(PLIST_PATH, plistContents, { mode: 0o644 });
 
   try {
+    // Hardcoded path constant, not user input
     await exec(`launchctl unload ${shellQuote(PLIST_PATH)}`);
   } catch {
     // Ignore unload failures; service may not be loaded yet.
@@ -41,6 +66,7 @@ export async function installWatchdog(): Promise<void> {
 
   await exec(`launchctl load ${shellQuote(PLIST_PATH)}`);
   logInfo(`Installed launchd agent at ${PLIST_PATH}`);
+  logInfo(`Resolved openclaw path: ${openclawPath}`);
 }
 
 function shellQuote(value: string): string {
