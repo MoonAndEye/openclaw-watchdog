@@ -8,3 +8,4 @@ export declare const RESTART_LIMIT = 5;
 export declare const COOLDOWN_MS: number;
 export declare const LAUNCH_AGENTS_DIR: string;
 export declare const PLIST_PATH: string;
+export declare const PID_FILE_PATH: string;

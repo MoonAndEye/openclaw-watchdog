@@ -1,21 +1,60 @@
 import { exec as execWithCallback } from 'node:child_process';
+import fs from 'node:fs';
 import { promisify } from 'node:util';
 import {
   CHECK_INTERVAL_MS,
   COOLDOWN_MS,
   HEALTH_CHECK_URL,
+  PID_FILE_PATH,
   RESTART_LIMIT,
   RESTART_VERIFY_DELAY_MS,
   RESTART_VERIFY_RETRIES,
   RESTART_WINDOW_MS
 } from './constants';
 import { checkGatewayHealth } from './health';
-import { logError, logInfo, logWarn } from './logger';
+import { ensureLogDirectory, logError, logInfo, logWarn } from './logger';
 
 const exec = promisify(execWithCallback);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquirePidLock(): boolean {
+  ensureLogDirectory();
+
+  try {
+    const content = fs.readFileSync(PID_FILE_PATH, 'utf8').trim();
+    const existingPid = parseInt(content, 10);
+    if (!isNaN(existingPid) && isProcessRunning(existingPid)) {
+      return false; // another watchdog is already running
+    }
+  } catch {
+    // PID file doesn't exist or unreadable — safe to proceed
+  }
+
+  fs.writeFileSync(PID_FILE_PATH, String(process.pid), { mode: 0o644 });
+  return true;
+}
+
+function releasePidLock(): void {
+  try {
+    const content = fs.readFileSync(PID_FILE_PATH, 'utf8').trim();
+    if (parseInt(content, 10) === process.pid) {
+      fs.rmSync(PID_FILE_PATH, { force: true });
+    }
+  } catch {
+    // Best effort cleanup
+  }
 }
 
 function recordRestart(restartTimestamps: number[], now: number): number[] {
@@ -37,6 +76,15 @@ async function verifyRestart(): Promise<boolean> {
 }
 
 export async function runWatchdog(): Promise<void> {
+  if (!acquirePidLock()) {
+    logWarn('Another watchdog instance is already running. Exiting.');
+    return;
+  }
+
+  process.on('exit', releasePidLock);
+  process.on('SIGINT', () => { releasePidLock(); process.exit(0); });
+  process.on('SIGTERM', () => { releasePidLock(); process.exit(0); });
+
   let restartTimestamps: number[] = [];
   let cooldownUntil = 0;
 

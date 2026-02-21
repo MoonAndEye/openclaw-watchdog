@@ -1,7 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runWatchdog = runWatchdog;
 const node_child_process_1 = require("node:child_process");
+const node_fs_1 = __importDefault(require("node:fs"));
 const node_util_1 = require("node:util");
 const constants_1 = require("./constants");
 const health_1 = require("./health");
@@ -9,6 +13,41 @@ const logger_1 = require("./logger");
 const exec = (0, node_util_1.promisify)(node_child_process_1.exec);
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function isProcessRunning(pid) {
+    try {
+        process.kill(pid, 0);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+function acquirePidLock() {
+    (0, logger_1.ensureLogDirectory)();
+    try {
+        const content = node_fs_1.default.readFileSync(constants_1.PID_FILE_PATH, 'utf8').trim();
+        const existingPid = parseInt(content, 10);
+        if (!isNaN(existingPid) && isProcessRunning(existingPid)) {
+            return false; // another watchdog is already running
+        }
+    }
+    catch {
+        // PID file doesn't exist or unreadable — safe to proceed
+    }
+    node_fs_1.default.writeFileSync(constants_1.PID_FILE_PATH, String(process.pid), { mode: 0o644 });
+    return true;
+}
+function releasePidLock() {
+    try {
+        const content = node_fs_1.default.readFileSync(constants_1.PID_FILE_PATH, 'utf8').trim();
+        if (parseInt(content, 10) === process.pid) {
+            node_fs_1.default.rmSync(constants_1.PID_FILE_PATH, { force: true });
+        }
+    }
+    catch {
+        // Best effort cleanup
+    }
 }
 function recordRestart(restartTimestamps, now) {
     const updated = restartTimestamps.filter((time) => now - time <= constants_1.RESTART_WINDOW_MS);
@@ -27,6 +66,13 @@ async function verifyRestart() {
     return false;
 }
 async function runWatchdog() {
+    if (!acquirePidLock()) {
+        (0, logger_1.logWarn)('Another watchdog instance is already running. Exiting.');
+        return;
+    }
+    process.on('exit', releasePidLock);
+    process.on('SIGINT', () => { releasePidLock(); process.exit(0); });
+    process.on('SIGTERM', () => { releasePidLock(); process.exit(0); });
     let restartTimestamps = [];
     let cooldownUntil = 0;
     const runCheck = async () => {

@@ -2,7 +2,7 @@
 
 A production-ready, **macOS-only** Node.js CLI that installs a `launchd` watchdog for OpenClaw Gateway.
 
-The watchdog checks `localhost:8787` every 10 minutes and runs `openclaw gateway start` when the service is not responsive.
+The watchdog checks `http://127.0.0.1:18789/` every 10 minutes and runs `openclaw gateway start` when the service is not responsive.
 
 ## Requirements
 
@@ -52,8 +52,9 @@ openclaw-watchdog logs
 ## Runner behavior
 
 - Health check interval: `600s` (configurable constant in `src/constants.ts`)
-- Health check method: TCP connection to `localhost:8787`
+- Health check method: HTTP GET `http://127.0.0.1:18789/` (expects 2xx)
 - On failure: executes `openclaw gateway start`
+- Post-restart verification: retries health check up to 3 times (5s intervals) to confirm gateway started
 - Crash-loop protection:
   - If restart attempts exceed 5 within 5 minutes,
   - restart attempts are paused for 10 minutes,

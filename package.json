@@ -29,6 +29,7 @@
   "files": [
     "bin",
     "dist",
+    "scripts",
     "LICENSE",
     "README.md",
     "package.json"
